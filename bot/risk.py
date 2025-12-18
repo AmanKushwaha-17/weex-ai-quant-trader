@@ -1,17 +1,22 @@
-# risk.py
-# Risk management and kill switch
-
 class RiskManager:
-    def __init__(self):
+    def __init__(self, client):
+        self.client = client
         print("RiskManager initialized")
-        
-    def check_limits(self):
-        # Logic to check risk limits
-        pass
 
-    def activate_kill_switch(self):
-        # Logic to activate kill switch
-        pass
+    def set_leverage(
+        self,
+        symbol: str,
+        leverage: int,
+        margin_mode: int = 1  # 1 = Cross, 3 = Isolated
+    ):
+        payload = {
+            "symbol": symbol,
+            "marginMode": margin_mode,
+            "longLeverage": str(leverage),
+            "shortLeverage": str(leverage),
+        }
+
+        return self.client.set_leverage(payload)
 
 
 

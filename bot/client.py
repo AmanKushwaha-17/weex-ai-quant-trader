@@ -87,6 +87,45 @@ class WeexClient:
 
         return response.status_code, response.text
 
+
+    def get_candles(self, symbol: str, period: str, limit: int = 300):
+        """
+        Fetch OHLCV candles from WEEX
+        
+        Args:
+            symbol: Trading pair (e.g., "cmt_btcusdt")
+            period: Timeframe (e.g., "15m", "1h", "4h")
+            limit: Number of candles to fetch (default: 300)
+        
+        Returns:
+            (status_code, response_dict)
+        """
+        request_path = "/capi/v2/market/candles"
+        query_string = f"?symbol={symbol}&period={period}&limit={limit}"
+
+        timestamp = str(int(time.time() * 1000))
+        signature = self._generate_signature_get(timestamp, "GET", request_path, query_string)
+
+        headers = {
+            "ACCESS-KEY": self.api_key,
+            "ACCESS-SIGN": signature,
+            "ACCESS-TIMESTAMP": timestamp,
+            "ACCESS-PASSPHRASE": self.api_passphrase,
+            "Content-Type": "application/json",
+            "locale": "en-US",
+        }
+
+        url = self.base_url + request_path + query_string
+        response = requests.get(url, headers=headers, timeout=10)
+
+        # Return status and parsed JSON
+        try:
+            return response.status_code, response.json()
+        except:
+            return response.status_code, None
+
+
+
     def set_leverage(self, payload: dict):
         request_path = "/capi/v2/account/leverage"
 
@@ -329,4 +368,7 @@ class WeexClient:
 
 if __name__ == "__main__":
     print("client.py loaded successfully")
+
+
+
 

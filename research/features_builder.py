@@ -160,3 +160,12 @@ def load_and_build(path: str) -> pd.DataFrame:
     df = pd.read_csv(path)
     df = build_crypto_features(df)
     return df
+
+
+# ---------- Public API wrapper (USED BY BOT) ----------
+
+def build_features(candles_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Standardized feature builder entrypoint for live / research code.
+    """
+    return build_crypto_features(candles_df)

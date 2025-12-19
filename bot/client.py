@@ -90,21 +90,26 @@ class WeexClient:
 
     def get_candles(self, symbol: str, period: str, limit: int = 300):
         """
-        Fetch OHLCV candles from WEEX
-        
-        Args:
-            symbol: Trading pair (e.g., "cmt_btcusdt")
-            period: Timeframe (e.g., "15m", "1h", "4h")
-            limit: Number of candles to fetch (default: 300)
-        
-        Returns:
-            (status_code, response_dict)
+        Fetch OHLCV candles from WEEX CONTRACT market
         """
+        # CONTRACT endpoint
         request_path = "/capi/v2/market/candles"
-        query_string = f"?symbol={symbol}&period={period}&limit={limit}"
+
+        # Valid contract granularities
+        allowed = {"1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d", "1w"}
+        if period not in allowed:
+            raise ValueError(f"Invalid granularity: {period}")
+
+        # NOTE: CONTRACT uses granularity, NOT period
+        query_string = f"?symbol={symbol}&granularity={period}&limit={limit}"
 
         timestamp = str(int(time.time() * 1000))
-        signature = self._generate_signature_get(timestamp, "GET", request_path, query_string)
+        signature = self._generate_signature_get(
+            timestamp,
+            "GET",
+            request_path,
+            query_string
+        )
 
         headers = {
             "ACCESS-KEY": self.api_key,
@@ -118,11 +123,17 @@ class WeexClient:
         url = self.base_url + request_path + query_string
         response = requests.get(url, headers=headers, timeout=10)
 
-        # Return status and parsed JSON
         try:
-            return response.status_code, response.json()
-        except:
+            data = response.json()
+        except Exception:
             return response.status_code, None
+
+        # CONTRACT candles return a RAW LIST (not {code,data})
+        if isinstance(data, list):
+            return response.status_code, data
+
+        return response.status_code, None
+
 
 
 
@@ -368,7 +379,5 @@ class WeexClient:
 
 if __name__ == "__main__":
     print("client.py loaded successfully")
-
-
 
 

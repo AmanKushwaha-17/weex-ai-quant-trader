@@ -33,26 +33,20 @@ class MarketData:
     # ======================================================
     def get_candles(self, symbol: str, timeframe: str, limit: int = 300):
         """
-        Fetch OHLCV candles from WEEX
+        Fetch OHLCV candles from WEEX CONTRACT market
         """
-        status, response = self.client.get_candles(
+        status, data = self.client.get_candles(
             symbol=symbol,
             period=timeframe,
             limit=limit,
         )
 
-        if status != 200 or response is None:
+        if status != 200 or data is None or len(data) < 50:
             logger.error(f"Candle fetch failed for {symbol}")
             return None
 
-        try:
-            raw = response["data"]
-        except Exception:
-            logger.error(f"Invalid candle response for {symbol}")
-            return None
-
         df = pd.DataFrame(
-            raw,
+            data,
             columns=[
                 "open_time",
                 "open",
@@ -65,13 +59,15 @@ class MarketData:
         )
 
         # Type casting
-        df["open_time"] = df["open_time"].astype("int64")
-        for col in ["open", "high", "low", "close", "volume"]:
+        df["open_time"] = pd.to_datetime(df["open_time"].astype(int), unit="ms")
+        for col in ["open", "high", "low", "close", "volume", "turnover"]:
             df[col] = df[col].astype(float)
 
-        # Ensure correct order
         df = df.sort_values("open_time").reset_index(drop=True)
         return df
+
+
+
     # ======================================================
     # 🆕 ADD 2️⃣: Feature Builder (ML-ready)
     # ======================================================

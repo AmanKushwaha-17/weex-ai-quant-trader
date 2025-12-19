@@ -10,10 +10,26 @@ def build_crypto_features(df: pd.DataFrame) -> pd.DataFrame:
     and returns a dataframe with added technical & regime features.
     """
 
+    # =====================================================
+    # Exchange compatibility (WEEX has no taker data)
+    # =====================================================
+    if "taker_buy_base" not in df.columns:
+        df["taker_buy_base"] = 0.0
+
+    if "taker_buy_quote" not in df.columns:
+        df["taker_buy_quote"] = 0.0
+
+    if "funding_rate" not in df.columns:
+        df["funding_rate"] = 0.0
+
+
+
     # 1) Ensure numeric dtypes
     for col in ['open', 'high', 'low', 'close', 'volume', 'taker_buy_base', 'funding_rate']:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
+
+
 
     # 2) Time handling
     df['open_time'] = pd.to_datetime(df['open_time'])

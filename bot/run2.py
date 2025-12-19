@@ -23,6 +23,7 @@ SYMBOLS = {
     "cmt_ethusdt": {"asset_id": 0},
 }
 
+
 DRY_RUN = True
 KILL_SWITCH = False
 
@@ -58,34 +59,19 @@ logger = logging.getLogger(__name__)
 # ======================
 
 def seconds_until_next_candle(timeframe: str) -> int:
-    """
-    Seconds until next candle close (UTC)
-    """
     now = datetime.utcnow()
 
     if not timeframe.endswith("m"):
         raise ValueError("Only minute timeframes supported")
 
     minutes = int(timeframe.replace("m", ""))
-    next_minute = ((now.minute // minutes) + 1) * minutes
-    next_hour = now.hour
-    next_day = now.date()
 
-    if next_minute >= 60:
-        next_minute = 0
-        next_hour += 1
-        if next_hour >= 24:
-            next_hour = 0
-            next_day = now.date() + timedelta(days=1)
-
-    next_close = datetime(
-        year=now.year,
-        month=now.month,
-        day=next_day.day,
-        hour=next_hour,
-        minute=next_minute,
-        second=2,  # buffer after candle close
-    )
+    # floor to current candle
+    current = now.replace(second=0, microsecond=0)
+    delta = timedelta(minutes=minutes)
+    next_close = (current - timedelta(
+        minutes=current.minute % minutes
+    )) + delta + timedelta(seconds=2)
 
     return max(1, int((next_close - now).total_seconds()))
 
@@ -173,7 +159,8 @@ def main():
 
                 logger.info(
                     f"[{symbol}] Candle closed @ "
-                    f"{datetime.utcfromtimestamp(candle_time / 1000)}"
+                    f"{candle_time}"
+
                 )
 
                 # ---- Daily reset ----

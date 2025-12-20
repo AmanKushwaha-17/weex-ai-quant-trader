@@ -9,6 +9,7 @@ from bot.client import WeexClient
 from bot.market import MarketData
 from bot.inference import InferenceEngine
 from research.features_builder import build_features
+from bot.state_persistence import setup_state, save_state
 
 
 # ======================
@@ -97,25 +98,7 @@ def main():
     # STATE
     # ======================
 
-    state = {}
-    for symbol in SYMBOLS:
-        state[symbol] = {
-            "equity": INITIAL_CAPITAL,
-            "day_start_equity": INITIAL_CAPITAL,
-            "daily_pnl": 0.0,
-            "current_day": date.today(),
-            "trading_enabled": True,
-            "open_trades": [],
-            "last_candle_time": None,
-        }
-
-    portfolio = {
-        "equity": INITIAL_CAPITAL * len(SYMBOLS),
-        "day_start_equity": INITIAL_CAPITAL * len(SYMBOLS),
-        "daily_pnl": 0.0,
-        "trading_enabled": True,
-        "current_day": date.today(),
-    }
+    state, portfolio = setup_state(SYMBOLS, INITIAL_CAPITAL)
 
     # ======================
     # DATA STORAGE
@@ -149,21 +132,23 @@ def main():
                     logger.warning(f"[{symbol}] Not enough candle data")
                     continue
 
+                # 🔍 DEBUG: Check what interval we're actually getting
+                time_diff = candles.iloc[-1]["open_time"] - candles.iloc[-2]["open_time"]
+                logger.info(f"[DEBUG] {symbol} Candle interval: {time_diff.total_seconds()/60:.0f} minutes")
+                logger.info(f"[DEBUG] Inference horizon: {inference.horizon} candles")
+
                 closed_candle = candles.iloc[-2]
                 candle_time = closed_candle["open_time"]
 
                 if candle_time == state[symbol]["last_candle_time"]:
+                    logger.info(f"[{symbol}] Skipping duplicate candle @ {candle_time}")
                     continue
 
                 state[symbol]["last_candle_time"] = candle_time
 
-                logger.info(
-                    f"[{symbol}] Candle closed @ "
-                    f"{candle_time}"
+                logger.info(f"[{symbol}] Candle closed @ {candle_time}")
 
-                )
-
-                # ---- Daily reset ----
+                # ---- Daily reset (safety backup) ----
                 today = date.today()
                 if today != state[symbol]["current_day"]:
                     state[symbol]["daily_pnl"] = 0.0
@@ -215,6 +200,7 @@ def main():
                     pass
 
                 elif len(state[symbol]["open_trades"]) >= MAX_CONCURRENT_TRADES:
+                    logger.info(f"[{symbol}] Max concurrent trades reached ({MAX_CONCURRENT_TRADES})")
                     pass
 
                 else:
@@ -230,32 +216,44 @@ def main():
 
                         size = min(atr_size, max_size)
 
+                        entry_time = datetime.utcnow()
+                        target_exit_time = entry_time + timedelta(hours=1)
+
                         state[symbol]["open_trades"].append({
                             "direction": signal["direction"],
                             "entry_price": last_price,
                             "size": size,
-                            "bars_left": inference.horizon,
+                            "entry_time": entry_time,
+                            "target_exit_time": target_exit_time
                         })
 
                         logger.info(
                             f"[{symbol}] DRY-OPEN | "
                             f"{'LONG' if signal['direction']==1 else 'SHORT'} "
-                            f"Price={last_price:.2f} "
-                            f"Size={size:.4f}"
+                            f"Entry={last_price:.2f} "
+                            f"Size={size:.4f} "
+                            f"Target_Exit={target_exit_time.strftime('%H:%M:%S')}"
                         )
 
                 # ---- Manage open trades ----
+                current_time = datetime.utcnow()
                 for trade in state[symbol]["open_trades"][:]:
-                    trade["bars_left"] -= 1
-                    if trade["bars_left"] > 0:
-                        continue
+                    time_held = (current_time - trade["entry_time"]).total_seconds() / 60
+                    
+                    # Check if 1 hour has passed
+                    if current_time < trade["target_exit_time"]:
+                        logger.info(
+                            f"[{symbol}] Position held for {time_held:.1f} min "
+                            f"(target: {(trade['target_exit_time'] - trade['entry_time']).total_seconds()/60:.0f} min)"
+                        )
+                        continue  # Not yet 1 hour, skip this trade
 
                     exit_price = market.get_last_price(symbol)
                     if exit_price is None:
                         continue
 
                     log_ret = math.log(exit_price / trade["entry_price"]) * trade["direction"]
-                    pnl = trade["size"] * (math.exp(log_ret) - 1)
+                    pnl = trade["size"] * trade["entry_price"] * (math.exp(log_ret) - 1)
 
                     state[symbol]["equity"] += pnl
                     state[symbol]["daily_pnl"] += pnl
@@ -274,16 +272,25 @@ def main():
 
                     logger.info(
                         f"[{symbol}] DRY-CLOSE | "
-                        f"PnL={pnl:.2f} Equity={state[symbol]['equity']:.2f}"
+                        f"Entry={trade['entry_price']:.2f} "
+                        f"Exit={exit_price:.2f} "
+                        f"Held={time_held:.1f}min "
+                        f"PnL={pnl:.2f} "
+                        f"Equity={state[symbol]['equity']:.2f}"
                     )
 
                     state[symbol]["open_trades"].remove(trade)
 
+            # ✅ Save state after processing all symbols
+            save_state(state, portfolio)
+
         except KeyboardInterrupt:
             logger.info("Interrupted by user")
+            save_state(state, portfolio)
             break
         except Exception:
             logger.exception("Main loop error")
+            save_state(state, portfolio)
             time.sleep(5)
 
     # ======================

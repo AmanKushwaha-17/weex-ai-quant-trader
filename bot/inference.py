@@ -19,7 +19,7 @@ class InferenceEngine:
     """
 
     # ML-only config (do NOT mix with trading / risk logic)
-    MIN_CONFIDENCE = 0.50
+    MIN_CONFIDENCE = 0.60
 
     def __init__(self, model_bundle_path: str):
         """

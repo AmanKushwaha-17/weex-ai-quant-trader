@@ -66,3 +66,6 @@ models/*.h5
 tmp/
 temp/
 research/*.bundle
+
+ui_state/
+research/*.csv

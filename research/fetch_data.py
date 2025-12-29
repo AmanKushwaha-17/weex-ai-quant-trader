@@ -4,12 +4,12 @@ from datetime import datetime, timezone
 import time
 import sys
 
-SYMBOL = "ETHUSDT"              # ETH perpetual futures (USD-M)
-OUT_CSV = "eth_15min_full.csv"  # output file name for ETH data
+SYMBOL = "BTCUSDT"              # ETH perpetual futures (USD-M)
+OUT_CSV = "btc_15min_full.csv"  # output file name for ETH data
 INTERVAL = "15m"                # Binance interval string
 
 
-start_dt = datetime(2019, 9, 8, tzinfo=timezone.utc)
+start_dt = datetime(2025, 12, 4, tzinfo=timezone.utc)
 end_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
 start_ms = int(start_dt.timestamp() * 1000)
 

@@ -249,6 +249,25 @@ class WeexClient:
         if resp is None:
             return None, None
         return resp.status_code, resp.text
+    
+    def get_positions(self):
+        request_path = "/capi/v2/account/position/allPosition"
+
+        resp = self._get(request_path)
+        if resp is None:
+            return None, None
+
+        return resp.status_code, resp.text
+    
+    def upload_ai_log(self, payload: dict):
+        body = json.dumps(payload)
+        resp = self._post("/capi/v2/order/uploadAiLog", body)
+        if resp is None:
+            return None, None
+        return resp.status_code, resp.text
+
+
+
 
 
 if __name__ == "__main__":
